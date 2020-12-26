@@ -2,6 +2,8 @@ package core
 
 import (
 	"fmt"
+	"io/ioutil"
+	"os"
 	"strings"
 
 	"github.com/aacebedo/gorofimenus/v1/core/loggers"
@@ -64,7 +66,7 @@ func (menu *Menu) runCommand(cmdToExec string) (res string, retCode interface{})
 }
 
 // GetSelection Triggers rofi to request the selection to the user.
-func (menu *Menu) GetSelection() (res string, err error) {
+func (menu *Menu) GetSelection() (res *doublylinkedlist.List, err error) {
 	if menu.items.Size() != 0 { //nolint:nestif // Detect 5 level of nesting however it is not
 		if _, cmdErr := menu.runCommand("rofi -v"); cmdErr != nil {
 			err = eris.Wrap(cmdErr.(error), "Unable to find rofi")
@@ -72,20 +74,31 @@ func (menu *Menu) GetSelection() (res string, err error) {
 			return
 		}
 
-		items := []string{}
+		tmpFile, cmdErr := ioutil.TempFile(os.TempDir(), "gorofimenu-")
+		if err != nil {
+			err = eris.Wrap(cmdErr.(error), "Unable to create the temporary file for rofi menus")
+
+			return
+		}
+		defer tmpFile.Close()
+		defer os.Remove(tmpFile.Name())
+
 		menu.items.Each(func(index int, value interface{}) {
-			items = append(items, shellescape.Quote(value.(*Menu).GetValue()))
+			_, err = tmpFile.WriteString(value.(*Menu).GetValue() + "\n")
+
+			if err != nil {
+				err = eris.Wrap(err, "Unable to write the temporary file for rofi menus")
+
+				return
+			}
 		})
 
-		itemsStr := strings.Join(items, "\n")
-		itemsStr = strings.TrimSuffix(itemsStr, "\n")
+		cmdToExec := fmt.Sprintf("rofi -i -dmenu -selected-row 0 %v -input %s",
+			shellescape.QuoteCommand(menu.GetOptions()), tmpFile.Name())
+		captured, cmdErr2 := menu.runCommand(cmdToExec)
 
-		cmdToExec := fmt.Sprintf("echo '%s' | rofi -i -dmenu -selected-row 0 %v", itemsStr,
-			shellescape.QuoteCommand(menu.GetOptions()))
-		captured, cmdErr := menu.runCommand(cmdToExec)
-
-		if cmdErr != nil {
-			err = eris.Wrap(cmdErr.(error), "Unable to execute rofi")
+		if cmdErr2 != nil {
+			err = eris.Wrap(cmdErr2.(error), "Unable to execute rofi")
 
 			return
 		}
@@ -99,13 +112,19 @@ func (menu *Menu) GetSelection() (res string, err error) {
 
 		if selecValue != nil {
 			res, err = selecValue.(*Menu).GetSelection()
+			if err == nil {
+				res.Insert(0, menu.GetValue())
+			}
 		} else {
 			err = eris.Errorf("Unable to find the selected menu item")
 
 			return
 		}
 	} else {
-		res = menu.GetValue()
+
+		res = doublylinkedlist.New()
+		res.Add(menu.GetValue())
+
 	}
 
 	return res, err //nolint:wrapcheck // Has been wrapped by eris
