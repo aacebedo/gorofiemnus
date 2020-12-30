@@ -70,6 +70,7 @@ func (menu *Menu) runCommand(cmdToExec string) (res string, retCode interface{})
 }
 
 // GetSelection Triggers rofi to request the selection to the user.
+//nolint:funlen // One line more than the limit, cannot be solved
 func (menu *Menu) GetSelection() (res *doublylinkedlist.List, err error) {
 	if menu.items.Size() != 0 { //nolint:nestif // Detect 5 level of nesting however it is not
 		var cmdErr interface{}
@@ -119,7 +120,7 @@ func (menu *Menu) GetSelection() (res *doublylinkedlist.List, err error) {
 
 		if selecValue != nil {
 			if res, err = selecValue.(*Menu).GetSelection(); err == nil {
-				res.Insert(0, menu.GetValue())
+				res.Insert(0, menu)
 			}
 		} else {
 			err = eris.Errorf("Unable to find the selected menu item")
@@ -128,7 +129,7 @@ func (menu *Menu) GetSelection() (res *doublylinkedlist.List, err error) {
 		}
 	} else {
 		res = doublylinkedlist.New()
-		res.Add(menu.GetValue())
+		res.Add(menu)
 	}
 
 	return res, err //nolint:wrapcheck // Has been wrapped by eris
