@@ -6,7 +6,7 @@ import (
 	"os"
 	"strings"
 
-	"github.com/aacebedo/gorofimenus/core/loggers"
+	"github.com/aacebedo/gorofimenus/utils/loggers"
 	"github.com/alessio/shellescape"
 	"github.com/commander-cli/cmd"
 	"github.com/emirpasic/gods/lists/doublylinkedlist"
