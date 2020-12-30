@@ -7,7 +7,8 @@ import (
 var (
 	log *logrus.Logger = logrus.New() //nolint:gochecknoglobals // Intends to set the loggers for the whole library
 	// MainLogger The main logger for the library.
-	MainLogger *logrus.Entry = log.WithFields(logrus.Fields{"emitter": "main"}) //nolint:gochecknoglobals // Intends to set the loggers for the whole library
+	//nolint:gochecknoglobals // Intends to set the loggers for the whole library
+	MainLogger *logrus.Entry = log.WithFields(logrus.Fields{"emitter": "main"})
 )
 
 // SetLogLevel Set the log level used in the library.

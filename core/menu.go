@@ -48,15 +48,19 @@ func (menu *Menu) GetValue() (res string) {
 }
 
 func (menu *Menu) runCommand(cmdToExec string) (res string, retCode interface{}) {
-	res, retCode = cmd.CaptureStandardOutput(func() (retCode interface{}) {
+	res, retCode = cmd.CaptureStandardOutput(func() (res interface{}) {
 		loggers.MainLogger.Debugf("Command to exec is '%s'", cmdToExec)
 		c := cmd.NewCommand(cmdToExec, cmd.WithStandardStreams, cmd.WithInheritedEnvironment(cmd.EnvVars{}))
 
 		if cmdErr := c.Execute(); cmdErr != nil {
-			retCode = eris.Wrap(cmdErr, "Unable to execute command")
+			res = eris.Wrap(cmdErr, "Unable to execute command")
+
+			return
 		}
 		if c.ExitCode() != 0 {
-			return eris.Errorf("Unable to execute command: '%s'", c.Stderr())
+			res = eris.Errorf("Unable to execute command: '%s'", c.Stderr())
+
+			return
 		}
 
 		return
@@ -68,15 +72,18 @@ func (menu *Menu) runCommand(cmdToExec string) (res string, retCode interface{})
 // GetSelection Triggers rofi to request the selection to the user.
 func (menu *Menu) GetSelection() (res *doublylinkedlist.List, err error) {
 	if menu.items.Size() != 0 { //nolint:nestif // Detect 5 level of nesting however it is not
-		if _, cmdErr := menu.runCommand("rofi -v"); cmdErr != nil {
+		var cmdErr interface{}
+		if _, cmdErr = menu.runCommand("rofi -v"); cmdErr != nil {
 			err = eris.Wrap(cmdErr.(error), "Unable to find rofi")
 
 			return
 		}
 
-		tmpFile, cmdErr := ioutil.TempFile(os.TempDir(), "gorofimenu-")
+		var tmpFile *os.File
+
+		tmpFile, err = ioutil.TempFile(os.TempDir(), "gorofimenu-")
 		if err != nil {
-			err = eris.Wrap(cmdErr.(error), "Unable to create the temporary file for rofi menus")
+			err = eris.Wrap(err, "Unable to create the temporary file for rofi menus")
 
 			return
 		}
@@ -84,21 +91,21 @@ func (menu *Menu) GetSelection() (res *doublylinkedlist.List, err error) {
 		defer os.Remove(tmpFile.Name())
 
 		menu.items.Each(func(index int, value interface{}) {
-			_, err = tmpFile.WriteString(value.(*Menu).GetValue() + "\n")
-
-			if err != nil {
+			if _, err = tmpFile.WriteString(value.(*Menu).GetValue() + "\n"); err != nil {
 				err = eris.Wrap(err, "Unable to write the temporary file for rofi menus")
 
 				return
 			}
 		})
 
-		cmdToExec := fmt.Sprintf("rofi -i -dmenu -selected-row 0 %v -input %s",
-			shellescape.QuoteCommand(menu.GetOptions()), tmpFile.Name())
-		captured, cmdErr2 := menu.runCommand(cmdToExec)
+		cmdToExec := fmt.Sprintf("rofi -i -dmenu -selected-row 0 %v -p %s -input %s",
+			shellescape.QuoteCommand(menu.GetOptions()), menu.GetValue(), tmpFile.Name())
 
-		if cmdErr2 != nil {
-			err = eris.Wrap(cmdErr2.(error), "Unable to execute rofi")
+		var captured string
+
+		captured, cmdErr = menu.runCommand(cmdToExec)
+		if cmdErr != nil {
+			err = eris.Wrap(cmdErr.(error), "Unable to execute rofi")
 
 			return
 		}
@@ -111,8 +118,7 @@ func (menu *Menu) GetSelection() (res *doublylinkedlist.List, err error) {
 		})
 
 		if selecValue != nil {
-			res, err = selecValue.(*Menu).GetSelection()
-			if err == nil {
+			if res, err = selecValue.(*Menu).GetSelection(); err == nil {
 				res.Insert(0, menu.GetValue())
 			}
 		} else {
@@ -121,10 +127,8 @@ func (menu *Menu) GetSelection() (res *doublylinkedlist.List, err error) {
 			return
 		}
 	} else {
-
 		res = doublylinkedlist.New()
 		res.Add(menu.GetValue())
-
 	}
 
 	return res, err //nolint:wrapcheck // Has been wrapped by eris
