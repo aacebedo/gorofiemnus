@@ -1,0 +1,19 @@
+project_name: gorofimenus
+before:
+  hooks:
+    - go mod download
+    - go generate ./...
+    - go test ./tests/...
+builds:
+  - skip: true
+archives:
+  - replacements:
+      linux: Linux
+      amd64: x86_64
+checksum:
+  name_template: 'checksums.txt'
+changelog:
+  sort: asc
+  filters:
+    exclude:
+      - '^tests:'
