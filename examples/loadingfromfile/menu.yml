@@ -1,0 +1,15 @@
+value: titi
+options: 
+      - "-p"
+      - "toto"
+submenus:
+  - value: title1
+    options: 
+      - "-p toto"
+    submenus:
+      - value: title3
+  - value: title2
+    options: 
+      - "-p"
+    submenus:
+      - value: title4
