@@ -47,29 +47,27 @@ func (menu *Menu) Value() (res string) {
 }
 
 func (menu *Menu) runCommand(cmdToExec string) (res string, err error) {
-	res, retCode := cmd.CaptureStandardOutput(func() (err interface{}) {
-		MainLogger.Debugf("Running command '%s'", cmdToExec)
-		c := cmd.NewCommand(cmdToExec, cmd.WithStandardStreams, cmd.WithInheritedEnvironment(cmd.EnvVars{}))
+	MainLogger.Debugf("Running command '%s'", cmdToExec)
+	c := cmd.NewCommand(cmdToExec, cmd.WithStandardStreams, cmd.WithInheritedEnvironment(cmd.EnvVars{}))
 
-		if cmdErr := c.Execute(); cmdErr != nil {
-			VerboseLogger.Errorf("Original error when running command: %s", cmdToExec)
-			err = eris.Wrapf(InternalError, "Error while executing command '%s'", cmdToExec)
-
-			return
-		}
-		if c.ExitCode() != 0 {
-			MainLogger.Errorf("Unable to execute command '%s': '%s'", cmdToExec, c.Stderr())
-			err = eris.Wrapf(InternalError, "Unable to execute command '%s', exit code is '%d'", cmdToExec, c.ExitCode())
-
-			return
-		}
-		MainLogger.Debugf("Command '%s' successfully executed", cmdToExec)
+	err = c.Execute()
+	if err != nil {
+		VerboseLogger.Errorf("Original error when running command: %s", cmdToExec)
+		err = eris.Wrapf(InternalError, "Error while executing command '%s'", cmdToExec)
 
 		return
-	})
-	if retCode != nil {
-		err = retCode.(error)
 	}
+
+	if c.ExitCode() != 0 {
+		MainLogger.Errorf("Unable to execute command '%s': '%s'", cmdToExec, c.Stderr())
+		err = eris.Wrapf(InternalError, "Unable to execute command '%s', exit code is '%d'", cmdToExec, c.ExitCode())
+
+		return
+	}
+
+	MainLogger.Debugf("Command '%s' successfully executed", cmdToExec)
+
+	res = c.Stdout()
 
 	return
 }
