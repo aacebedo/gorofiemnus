@@ -42,7 +42,8 @@
                  "tabnine.tabnine-vscode",
                  "takumii.tabspace",
                  "visualstudioexptteam.vscodeintellicode",
-                 "redhat.vscode-yaml"
+                 "redhat.vscode-yaml",
+                 "shd101wyy.markdown-preview-enhanced"
                 ]
 
 	// Use 'forwardPorts' to make a list of ports inside the container available locally.
