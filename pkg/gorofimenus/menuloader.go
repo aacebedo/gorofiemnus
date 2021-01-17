@@ -15,6 +15,7 @@ type MenuDescriptor struct {
 	Value    string           `yaml:"value,omitempty"`
 	Options  []string         `yaml:"options,omitempty"`
 	Submenus []MenuDescriptor `yaml:"submenus,omitempty"`
+	Payload  interface{}      `yaml:"payload,omitempty"`
 }
 
 // NewMenuLoader Create a new MenuLoader.
@@ -49,7 +50,7 @@ func (ml *MenuLoader) LoadMenusFromFile(filepath string) (res *Menu, err error) 
 		return
 	}
 
-	res, err = ml.loadMenu(*menuDesc)
+	res, err = ml.loadMenu(menuDesc)
 
 	return
 }
@@ -67,15 +68,15 @@ func (ml *MenuLoader) LoadMenusFromString(strToLoad string) (res *Menu, err erro
 		return
 	}
 
-	res, err = ml.loadMenu(*menuDesc)
+	res, err = ml.loadMenu(menuDesc)
 
 	MainLogger.Debug("Menu successfully loaded")
 
 	return
 }
 
-func (ml *MenuLoader) loadMenu(menuDesc MenuDescriptor) (res *Menu, err error) {
-	res = NewMenu(menuDesc.Value)
+func (ml *MenuLoader) loadMenu(menuDesc *MenuDescriptor) (res *Menu, err error) {
+	res = NewMenu(menuDesc.Value, menuDesc.Payload)
 	MainLogger.Debugf("Recursion for loading menu '%s'", menuDesc.Value)
 
 	if len(menuDesc.Options) != 0 {
@@ -84,16 +85,18 @@ func (ml *MenuLoader) loadMenu(menuDesc MenuDescriptor) (res *Menu, err error) {
 	}
 
 	for _, val := range menuDesc.Submenus {
+		subMenuDesc := val
+
 		var subMenu *Menu
 
-		subMenu, err = ml.loadMenu(val)
+		subMenu, err = ml.loadMenu(&subMenuDesc)
 		if err != nil {
 			err = eris.Wrap(err, "Unable to load menu")
 
 			return
 		}
 
-		err = res.AddSubMenu(*subMenu)
+		err = res.AddSubMenu(subMenu)
 	}
 
 	return

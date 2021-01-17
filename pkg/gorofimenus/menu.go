@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"os"
+	"strconv"
 	"strings"
 
 	"github.com/alessio/shellescape"
@@ -20,13 +21,14 @@ type (
 	Menu struct {
 		items   doublylinkedlist.List
 		value   string
+		payload interface{}
 		options Options
 	}
 )
 
 // NewMenu Instantiates a new menu.
-func NewMenu(value string) (res *Menu) {
-	res = &Menu{items: *doublylinkedlist.New(), value: value}
+func NewMenu(value string, payload interface{}) (res *Menu) {
+	res = &Menu{items: *doublylinkedlist.New(), value: value, payload: payload}
 
 	return
 }
@@ -41,17 +43,21 @@ func (menu *Menu) SetOptions(options Options) {
 	menu.options = options
 }
 
-// GetValue Gets the value of the item when the menu is displayed in rofi.
+// GetValue Gets the value of the item .
 func (menu *Menu) Value() (res string) {
 	return menu.value
+}
+
+// Payload Gets the payload of the item.
+func (menu *Menu) Payload() (res interface{}) {
+	return menu.payload
 }
 
 func (menu *Menu) runCommand(cmdToExec string) (res string, err error) {
 	MainLogger.Debugf("Running command '%s'", cmdToExec)
 	c := cmd.NewCommand(cmdToExec, cmd.WithStandardStreams, cmd.WithInheritedEnvironment(cmd.EnvVars{}))
 
-	err = c.Execute()
-	if err != nil {
+	if err = c.Execute(); err != nil {
 		VerboseLogger.Errorf("Original error when running command: %s", cmdToExec)
 		err = eris.Wrapf(InternalError, "Error while executing command '%s'", cmdToExec)
 
@@ -117,7 +123,7 @@ func (menu *Menu) GetSelection(keepInputFile bool) (res *doublylinkedlist.List, 
 
 		MainLogger.Debug("Rofi input file successfully filled")
 
-		cmdToExec := fmt.Sprintf("rofi -i -dmenu -selected-row 0 -p %s -input %s %v",
+		cmdToExec := fmt.Sprintf("rofi -i -dmenu -selected-row 0 -p %s -input %s -format i %v",
 			shellescape.Quote(shellescape.StripUnsafe(menu.Value())), tmpFile.Name(), shellescape.QuoteCommand(menu.Options()))
 
 		var captured string
@@ -133,14 +139,18 @@ func (menu *Menu) GetSelection(keepInputFile bool) (res *doublylinkedlist.List, 
 
 		captured = strings.Trim(captured, "\n")
 
-		MainLogger.Debugf("Selection is successful, selected value is '%s'", captured)
+		var idx int
 
-		_, selectedValue := menu.items.Find(func(index int, value interface{}) bool {
-			selectedMenu := value.(*Menu)
+		idx, err = strconv.Atoi(captured)
+		if err != nil {
+			err = eris.Wrapf(InternalError, "Invalid index '%s' returned by rofi", captured)
 
-			return selectedMenu.Value() == captured
-		})
+			return
+		}
 
+		MainLogger.Debugf("Selection is successful, index of the selected is '%d'", idx)
+
+		selectedValue, _ := menu.items.Get(idx)
 		if selectedValue != nil {
 			MainLogger.Debug("Requesting the selection for submenu")
 
@@ -163,41 +173,24 @@ func (menu *Menu) GetSelection(keepInputFile bool) (res *doublylinkedlist.List, 
 }
 
 // AddSubMenu Adds a submenu to the menu.
-func (menu *Menu) AddSubMenu(subMenu Menu) (err error) {
+func (menu *Menu) AddSubMenu(subMenu *Menu) (err error) {
 	MainLogger.Debugf("Adding submenu '%s' to menu '%s'", subMenu.Value(), menu.Value())
-	itemIdx, _ := menu.items.Find(func(index int, value interface{}) bool {
-		selectedMenu := value.(*Menu)
 
-		return selectedMenu.Value() == subMenu.Value()
-	})
-
-	if itemIdx != -1 {
-		err = eris.Wrapf(AlreadyExistsError, "Menu '%s' already contains submenu '%s'", menu.Value(), subMenu.Value())
-
-		return
-	}
-
-	menu.items.Add(&subMenu)
+	menu.items.Add(subMenu)
 	MainLogger.Debugf("Successfully added submenu '%s' to menu '%s'", subMenu.Value(), menu.Value())
 
 	return
 }
 
 // RemoveSubMenu Removes the submenu from the menu.
-func (menu *Menu) RemoveSubMenu(subMenu *Menu) (err error) {
-	itemIdx, _ := menu.items.Find(func(index int, value interface{}) bool {
-		selectedMenu := value.(*Menu)
-
-		return selectedMenu.Value() == subMenu.Value()
-	})
-
-	if itemIdx == -1 {
-		err = eris.Wrapf(NotExistsError, "Menu '%s' does not contains submenu '%s'", menu.Value(), subMenu.Value())
+func (menu *Menu) RemoveSubMenu(index uint32) (err error) {
+	if int(index) >= menu.items.Size() {
+		err = eris.Wrapf(NotExistsError, "Menu '%s' contains only '%d' submenus", menu.Value(), menu.items.Size())
 
 		return
 	}
 
-	menu.items.Remove(itemIdx)
+	menu.items.Remove(int(index))
 
 	return
 }
